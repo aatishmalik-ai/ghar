@@ -1,0 +1,521 @@
+{
+ "v": 1,
+ "design": "vastu",
+ "rooms": [
+  {
+   "id": "store",
+   "name": "Store",
+   "x": 0,
+   "z": 0,
+   "w": 10,
+   "d": 7,
+   "floor": "cement",
+   "wall": "plain"
+  },
+  {
+   "id": "bath",
+   "name": "Bath",
+   "x": 0,
+   "z": 7,
+   "w": 10,
+   "d": 8,
+   "floor": "bathTile",
+   "wall": "tile"
+  },
+  {
+   "id": "hall",
+   "name": "Hall",
+   "x": 10,
+   "z": 0,
+   "w": 22,
+   "d": 15,
+   "floor": "marble",
+   "wall": "warm",
+   "zone": "living"
+  },
+  {
+   "id": "dining",
+   "name": "Dining",
+   "x": 18,
+   "z": 15,
+   "w": 14,
+   "d": 7,
+   "floor": "marble",
+   "wall": "warm",
+   "zone": "living",
+   "lx": 5
+  },
+  {
+   "id": "kitchen",
+   "name": "Open kitchen",
+   "x": 18,
+   "z": 22,
+   "w": 14,
+   "d": 10,
+   "floor": "kitchenTile",
+   "wall": "sand",
+   "zone": "living"
+  },
+  {
+   "id": "bed",
+   "name": "Bedroom",
+   "x": 0,
+   "z": 15,
+   "w": 18,
+   "d": 17,
+   "floor": "wood",
+   "wall": "blush"
+  }
+ ],
+ "openings": [
+  {
+   "type": "door",
+   "axis": "h",
+   "at": 0,
+   "pos": 19.25,
+   "w": 3.5,
+   "hinge": -1,
+   "swing": 1,
+   "main": true
+  },
+  {
+   "type": "window",
+   "axis": "h",
+   "at": 0,
+   "pos": 14.8,
+   "w": 4
+  },
+  {
+   "type": "window",
+   "axis": "v",
+   "at": 32,
+   "pos": 3.2,
+   "w": 4
+  },
+  {
+   "type": "window",
+   "axis": "v",
+   "at": 32,
+   "pos": 18.5,
+   "w": 4
+  },
+  {
+   "type": "window",
+   "axis": "v",
+   "at": 32,
+   "pos": 23.75,
+   "w": 3,
+   "sill": 3.5,
+   "h": 3.5
+  },
+  {
+   "type": "window",
+   "axis": "h",
+   "at": 32,
+   "pos": 25.5,
+   "w": 4,
+   "sill": 3.5,
+   "h": 3.5
+  },
+  {
+   "type": "door",
+   "axis": "v",
+   "at": 10,
+   "pos": 2.75,
+   "w": 2.5,
+   "hinge": -1,
+   "swing": -1
+  },
+  {
+   "type": "vent",
+   "axis": "v",
+   "at": 0,
+   "pos": 3.5,
+   "w": 2
+  },
+  {
+   "type": "door",
+   "axis": "v",
+   "at": 10,
+   "pos": 11.45,
+   "w": 2.5,
+   "hinge": 1,
+   "swing": -1,
+   "bath": true
+  },
+  {
+   "type": "door",
+   "axis": "h",
+   "at": 15,
+   "pos": 2.5,
+   "w": 2.5,
+   "hinge": -1,
+   "swing": -1,
+   "bath": true
+  },
+  {
+   "type": "vent",
+   "axis": "v",
+   "at": 0,
+   "pos": 11.5,
+   "w": 2
+  },
+  {
+   "type": "almirah",
+   "axis": "h",
+   "at": 15,
+   "pos": 7,
+   "w": 5.5,
+   "face": 1
+  },
+  {
+   "type": "door",
+   "axis": "h",
+   "at": 15,
+   "pos": 13.5,
+   "w": 3,
+   "hinge": 1,
+   "swing": 1
+  },
+  {
+   "type": "window",
+   "axis": "v",
+   "at": 0,
+   "pos": 20.5,
+   "w": 4
+  },
+  {
+   "type": "window",
+   "axis": "h",
+   "at": 32,
+   "pos": 8.3,
+   "w": 4,
+   "sill": 4.5,
+   "h": 2.5
+  },
+  {
+   "type": "window",
+   "axis": "v",
+   "at": 0,
+   "pos": 27,
+   "w": 4,
+   "hinge": -1,
+   "swing": 1
+  }
+ ],
+ "items": [
+  {
+   "type": "queenBed",
+   "x": 5.68,
+   "z": 27.8,
+   "rot": 180,
+   "id": "queenBed-0"
+  },
+  {
+   "type": "queenBed",
+   "x": 10.88,
+   "z": 27.8,
+   "rot": 180,
+   "v": 1,
+   "id": "queenBed-1"
+  },
+  {
+   "type": "fan",
+   "x": 14.4,
+   "z": 22.2,
+   "rot": 315,
+   "id": "fan-2"
+  },
+  {
+   "type": "frame",
+   "x": 17.75,
+   "z": 20.2,
+   "rot": -90,
+   "v": 1,
+   "id": "frame-3"
+  },
+  {
+   "type": "frame",
+   "x": 17.75,
+   "z": 22.4,
+   "rot": -90,
+   "v": 5,
+   "id": "frame-4"
+  },
+  {
+   "type": "shower",
+   "x": 2.25,
+   "z": 8.69,
+   "rot": 0,
+   "id": "shower-5"
+  },
+  {
+   "type": "wc",
+   "x": 6.2,
+   "z": 8.34,
+   "rot": 0,
+   "id": "wc-6"
+  },
+  {
+   "type": "basin",
+   "x": 8.9,
+   "z": 7.89,
+   "rot": 0,
+   "id": "basin-7"
+  },
+  {
+   "type": "geyser",
+   "x": 2.25,
+   "z": 7.69,
+   "rot": 0,
+   "id": "geyser-8"
+  },
+  {
+   "type": "rack",
+   "x": 1.375,
+   "z": 2.3,
+   "rot": 90,
+   "id": "rack-9"
+  },
+  {
+   "type": "rack",
+   "x": 1.375,
+   "z": 5.3,
+   "rot": 90,
+   "id": "rack-10"
+  },
+  {
+   "type": "rack",
+   "x": 5.2,
+   "z": 1.375,
+   "rot": 0,
+   "id": "rack-11"
+  },
+  {
+   "type": "boxStack",
+   "x": 4.8,
+   "z": 5.9,
+   "rot": 0,
+   "id": "boxStack-12"
+  },
+  {
+   "type": "boxStack",
+   "x": 7,
+   "z": 5.9,
+   "rot": 0,
+   "id": "boxStack-13"
+  },
+  {
+   "type": "tvUnit",
+   "x": 30.6,
+   "z": 9.8,
+   "rot": -90,
+   "id": "tvUnit-14"
+  },
+  {
+   "type": "partyBox",
+   "x": 30.5,
+   "z": 5.98,
+   "rot": -90,
+   "id": "partyBox-15"
+  },
+  {
+   "type": "micStand",
+   "x": 28.4,
+   "z": 5,
+   "rot": -90,
+   "id": "micStand-16"
+  },
+  {
+   "type": "micStand",
+   "x": 29,
+   "z": 14.3,
+   "rot": -90,
+   "id": "micStand-17"
+  },
+  {
+   "type": "sofaLeather",
+   "x": 21.7,
+   "z": 9.8,
+   "rot": 90,
+   "id": "sofaLeather-18"
+  },
+  {
+   "type": "sofaWood",
+   "x": 27.9,
+   "z": 2.1,
+   "rot": 0,
+   "id": "sofaWood-19"
+  },
+  {
+   "type": "chairWood",
+   "x": 24.4,
+   "z": 13.4,
+   "rot": 180,
+   "id": "chairWood-20"
+  },
+  {
+   "type": "chairWood",
+   "x": 27,
+   "z": 13.4,
+   "rot": 180,
+   "id": "chairWood-21"
+  },
+  {
+   "type": "rug",
+   "x": 26.2,
+   "z": 9.6,
+   "rot": 90,
+   "w": 8,
+   "d": 6,
+   "id": "rug-22"
+  },
+  {
+   "type": "coffeeTable",
+   "x": 26.3,
+   "z": 9.6,
+   "rot": 90,
+   "id": "coffeeTable-23"
+  },
+  {
+   "type": "twinBed",
+   "x": 15.9,
+   "z": 2.4,
+   "rot": 90,
+   "id": "twinBed-24"
+  },
+  {
+   "type": "frameWide",
+   "x": 26.4,
+   "z": 0.81,
+   "rot": 0,
+   "v": 0,
+   "id": "frameWide-25"
+  },
+  {
+   "type": "frame",
+   "x": 29.2,
+   "z": 0.81,
+   "rot": 0,
+   "v": 3,
+   "id": "frame-26"
+  },
+  {
+   "type": "frame",
+   "x": 10.25,
+   "z": 6.1,
+   "rot": 90,
+   "v": 4,
+   "id": "frame-27"
+  },
+  {
+   "type": "frameWide",
+   "x": 10.25,
+   "z": 8.4,
+   "rot": 90,
+   "v": 2,
+   "id": "frameWide-28"
+  },
+  {
+   "type": "plant",
+   "x": 30.4,
+   "z": 14.2,
+   "rot": 0,
+   "id": "plant-29"
+  },
+  {
+   "type": "diningTable",
+   "x": 23.6,
+   "z": 18.4,
+   "rot": 0,
+   "id": "diningTable-30"
+  },
+  {
+   "type": "plasticChair",
+   "x": 22.4,
+   "z": 16.25,
+   "rot": 0,
+   "id": "plasticChair-31"
+  },
+  {
+   "type": "plasticChair",
+   "x": 24.8,
+   "z": 16.25,
+   "rot": 0,
+   "id": "plasticChair-32"
+  },
+  {
+   "type": "plasticChair",
+   "x": 23.6,
+   "z": 20.6,
+   "rot": 180,
+   "id": "plasticChair-33"
+  },
+  {
+   "type": "counterSink",
+   "x": 30.25,
+   "z": 23.75,
+   "rot": -90,
+   "id": "counterSink-34"
+  },
+  {
+   "type": "counter",
+   "x": 30.25,
+   "z": 26.125,
+   "rot": -90,
+   "w": 1.75,
+   "id": "counter-35"
+  },
+  {
+   "type": "counterStove",
+   "x": 30.25,
+   "z": 28.25,
+   "rot": -90,
+   "id": "counterStove-36"
+  },
+  {
+   "type": "counter",
+   "x": 30.25,
+   "z": 30.375,
+   "rot": -90,
+   "w": 1.75,
+   "id": "counter-37"
+  },
+  {
+   "type": "counter",
+   "x": 26.125,
+   "z": 30.25,
+   "rot": 180,
+   "w": 6.25,
+   "id": "counter-38"
+  },
+  {
+   "type": "fridge",
+   "x": 21.7,
+   "z": 30.1,
+   "rot": 180,
+   "id": "fridge-39"
+  },
+  {
+   "type": "washer",
+   "x": 17.3,
+   "z": 30.25,
+   "rot": 180,
+   "id": "washer-40"
+  },
+  {
+   "type": "shoeRack",
+   "x": 26.2,
+   "z": -0.6,
+   "rot": 180,
+   "id": "shoeRack-41"
+  },
+  {
+   "type": "plant",
+   "x": 19.4,
+   "z": -1.3,
+   "rot": 0,
+   "id": "plant-42"
+  }
+ ]
+}

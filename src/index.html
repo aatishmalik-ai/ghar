@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ghar · 32×32 Home Planner</title>
+<style>
+:root {
+  --ink: #221f1b; --ink-2: #5d564d; --ink-3: #8a8378;
+  --paper: #f5efe5; --panel: rgba(251, 248, 242, 0.9); --line: rgba(34, 31, 27, 0.1);
+  --accent: #b4532a; --accent-soft: rgba(180, 83, 42, 0.12); --teal: #2f5d58; --warn: #b42318; --ok: #2f7a4a;
+  --shadow: 0 1px 2px rgba(34,31,27,.06), 0 4px 12px rgba(34,31,27,.07), 0 16px 40px rgba(34,31,27,.10);
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --sans: "Avenir Next", "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --z-labels: 5; --z-panel: 20; --z-tip: 40; --z-toast: 100;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--paper); color: var(--ink);
+  font: 14px/1.45 var(--sans); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+p, li { text-wrap: pretty; }
+button, select, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#stage { position: fixed; inset: 0; }
+#stage canvas { display: block; touch-action: none; }
+.label-layer { position: fixed !important; inset: 0; pointer-events: none; z-index: var(--z-labels); }
+
+/* labels in the 3D scene */
+.room-label { pointer-events: none; text-align: center; white-space: nowrap; padding: 4px 9px 5px; border-radius: 9px;
+  background: rgba(255, 253, 249, 0.8); box-shadow: 0 1px 3px rgba(34,31,27,.12); backdrop-filter: blur(3px); }
+.room-label b { display: block; font: 650 10.5px/1.2 var(--sans); letter-spacing: .14em; text-transform: uppercase; color: var(--ink); }
+.room-label span { display: block; font: 600 12.5px/1.25 var(--sans); font-variant-numeric: tabular-nums; }
+.room-label em { display: block; font: 500 11px/1.2 var(--sans); font-style: normal; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.room-label.compact { padding: 2px 6px 3px; }
+.room-label.compact b { font-size: 9px; letter-spacing: .1em; }
+.room-label.compact span { font-size: 10.5px; }
+.room-label.compact em { display: none; }
+.item-tag { pointer-events: none; font: 700 9.5px/1 var(--sans); letter-spacing: .05em; color: #fff; background: rgba(34,31,27,.72); padding: 2px 5px; border-radius: 5px; white-space: nowrap; }
+.entry-label { pointer-events: none; font: 700 10.5px/1 var(--sans); letter-spacing: .16em; text-transform: uppercase; color: #fff; background: var(--accent); padding: 4px 9px; border-radius: 999px; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+.tight .room-label { padding: 2px 6px 3px; }
+.tight .room-label b { font-size: 9px; letter-spacing: .1em; }
+.tight .room-label span { font-size: 10.5px; }
+.tight .room-label em { display: none; }
+.tight .item-tag { font-size: 8.5px; padding: 1px 4px; }
+.room-label.behind { opacity: 0.12; }
+.grip { pointer-events: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: #fff; font: 700 13px/1 var(--sans); box-shadow: 0 0 0 3px rgba(255,255,255,.85), 0 2px 6px rgba(0,0,0,.25); }
+.suggested { font-size: 12px; color: var(--ink-2); margin: -4px 0 10px; }
+.dim-label { font: 650 12px/1 var(--sans); color: #3a352f; background: var(--paper); padding: 3px 6px; border-radius: 5px; font-variant-numeric: tabular-nums; }
+.shed-label { font-weight: 600; letter-spacing: .06em; text-transform: uppercase; font-size: 10.5px; background: rgba(245,239,229,.85); }
+.north-label { background: none; font-size: 11px; letter-spacing: .12em; color: var(--ink-2); }
+
+/* chrome */
+.glass { background: var(--panel); backdrop-filter: blur(14px) saturate(1.2); box-shadow: var(--shadow); border-radius: 16px; }
+.topbar { position: fixed; top: 12px; left: 12px; right: 12px; display: flex; gap: 12px; align-items: center; z-index: var(--z-panel); pointer-events: none; }
+.topbar > * { pointer-events: auto; }
+.brand { display: flex; gap: 10px; align-items: center; padding: 8px 14px 8px 8px; }
+.mark { width: 38px; height: 38px; border-radius: 11px; background: var(--accent); color: #fff; display: grid; place-items: center; font: 600 17px/1 var(--serif); }
+.brand h1 { font: 600 16px/1.15 var(--serif); letter-spacing: .01em; }
+.brand p { margin: 1px 0 0; font-size: 11.5px; color: var(--ink-2); }
+.tabs { display: flex; padding: 5px; gap: 4px; }
+.tab { border: 0; background: transparent; padding: 8px 14px; border-radius: 11px; cursor: pointer; display: flex; gap: 8px; align-items: center; transition: background-color 120ms var(--ease), color 120ms var(--ease); }
+.tab .n { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font: 650 11.5px/1 var(--sans); background: rgba(34,31,27,.08); }
+.tab .t { font: 600 13.5px/1.1 var(--sans); }
+.tab[aria-selected="true"] { background: var(--ink); color: #fbf7f0; }
+.tab[aria-selected="true"] .n { background: var(--accent); color: #fff; }
+@media (hover: hover) { .tab:not([aria-selected="true"]):hover { background: rgba(34,31,27,.06); } }
+.spacer { flex: 1; }
+
+.panel { position: fixed; z-index: var(--z-panel); overflow: auto; overscroll-behavior: contain; }
+.left { top: 76px; left: 12px; bottom: 84px; width: 340px; padding: 18px 18px 14px; transition: transform 220ms var(--ease), opacity 220ms var(--ease); }
+.left.collapsed { transform: translateX(calc(-100% - 20px)); opacity: 0; pointer-events: none; }
+.left h2 { font: 600 24px/1.1 var(--serif); }
+.tagline { margin: 6px 0 12px; color: var(--ink-2); }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 0 0 12px; }
+.stat { background: rgba(255,255,255,.65); border-radius: 10px; padding: 8px 9px; box-shadow: inset 0 0 0 1px var(--line); }
+.stat b { display: block; font: 650 17px/1.1 var(--sans); font-variant-numeric: tabular-nums; }
+.stat b small { font-size: 10.5px; font-weight: 600; color: var(--ink-2); }
+.stat span { font-size: 10.5px; color: var(--ink-2); letter-spacing: .04em; text-transform: uppercase; }
+.beds b { font: 650 10px/1.6 var(--sans); letter-spacing: .12em; text-transform: uppercase; flex: none; }
+.beds { display: flex; gap: 8px; align-items: flex-start; background: var(--accent-soft); color: #6d3217; border-radius: 10px; padding: 8px 10px; font-size: 12.5px; margin-bottom: 12px; }
+.sec { margin: 14px 0 6px; font: 650 10.5px/1 var(--sans); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); }
+.list { margin: 0; padding-left: 18px; }
+.list li { margin: 0 0 6px; font-size: 13px; }
+.list.cons li::marker { color: var(--ink-3); }
+.list.pros li::marker { color: var(--accent); }
+.vastu { display: flex; flex-wrap: wrap; gap: 5px; }
+.chip { font-size: 11.5px; padding: 3px 8px; border-radius: 999px; background: rgba(47,122,74,.1); color: #1f5a35; font-variant-numeric: tabular-nums; }
+.chip.meh { background: rgba(34,31,27,.07); color: var(--ink-2); }
+table.rooms { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+table.rooms td { padding: 5px 4px; border-top: 1px solid var(--line); }
+table.rooms td:nth-child(2), table.rooms td:nth-child(3) { text-align: right; white-space: nowrap; }
+table.rooms tr.total td { font-weight: 650; border-top: 1.5px solid rgba(34,31,27,.25); }
+.swatch { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 6px; vertical-align: 0; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
+.warns { margin: 0; padding: 0; list-style: none; }
+.warns li { display: flex; gap: 6px; padding: 6px 8px; border-radius: 8px; background: rgba(180,35,24,.08); color: #7a1a12; margin-bottom: 4px; font-size: 12.5px; cursor: pointer; }
+.allgood { color: var(--ok); font-size: 12.5px; }
+
+.right { top: 76px; right: 12px; width: 280px; padding: 16px; max-height: calc(100% - 170px); }
+.right[hidden] { display: none; }
+.kicker { font: 650 10.5px/1 var(--sans); letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+.right h3 { font: 600 19px/1.2 var(--serif); margin: 6px 0 4px; }
+.meta { color: var(--ink-2); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
+.btn { border: 0; background: rgba(34,31,27,.07); padding: 7px 11px; border-radius: 9px; cursor: pointer; font-size: 12.5px; font-weight: 600; transition: background-color 120ms var(--ease), transform 120ms var(--ease); display: inline-flex; gap: 6px; align-items: center; min-height: 32px; }
+.btn:active { transform: scale(0.97); }
+@media (hover: hover) { .btn:hover { background: rgba(34,31,27,.12); } }
+.btn.danger { color: var(--warn); }
+.btn.primary { background: var(--ink); color: #fbf7f0; }
+.field { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.field input { width: 74px; padding: 5px 7px; border-radius: 8px; border: 1px solid var(--line); background: #fff; font-variant-numeric: tabular-nums; }
+.clashbox { margin-top: 10px; padding: 8px 10px; border-radius: 9px; background: rgba(180,35,24,.08); color: #7a1a12; font-size: 12.5px; }
+
+.toolbar { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); display: flex; gap: 4px; align-items: center; padding: 6px; z-index: var(--z-panel); max-width: calc(100% - 24px); }
+.seg { display: flex; gap: 2px; padding: 2px; border-radius: 11px; background: rgba(34,31,27,.06); }
+.tb { border: 0; background: transparent; padding: 7px 11px; border-radius: 9px; cursor: pointer; font-weight: 600; font-size: 12.5px; white-space: nowrap; min-height: 34px; display: inline-flex; gap: 6px; align-items: center; transition: background-color 120ms var(--ease), color 120ms var(--ease), transform 120ms var(--ease); }
+.tb:active { transform: scale(0.97); }
+.tb[aria-pressed="true"] { background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.12); color: var(--accent); }
+@media (hover: hover) { .tb[aria-pressed="false"]:hover, .tb:not([aria-pressed]):hover { background: rgba(34,31,27,.07); } }
+.tb:disabled { opacity: .4; pointer-events: none; }
+.sep { width: 1px; align-self: stretch; margin: 6px 4px; background: var(--line); }
+.tbl { font: 650 10px/1 var(--sans); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); padding: 0 4px 0 6px; }
+select.tb { appearance: none; background: rgba(34,31,27,.06); padding-right: 12px; }
+.menu { position: relative; }
+.menu summary { list-style: none; }
+.menu summary::-webkit-details-marker { display: none; }
+.menu-pop { position: absolute; right: 0; bottom: calc(100% + 10px); display: flex; flex-direction: column; align-items: stretch; padding: 6px; min-width: 180px; }
+.menu-pop .tb { justify-content: flex-start; }
+.swap { display: flex; gap: 2px; width: 196px; justify-content: center; }
+.swap select { width: 100%; }
+.wallonly { display: none; }
+body.walls .wallonly { display: inline-flex; }
+body.walls .furnonly { display: none; }
+body.walking .edit, .tb:disabled { opacity: .35; pointer-events: none; }
+.focus .room-label { opacity: .22; }
+.plot-label { background: none; color: var(--accent); font-size: 11px; letter-spacing: .06em; }
+
+.hint { position: fixed; left: 50%; bottom: 70px; transform: translateX(-50%); font-size: 12px; color: var(--ink-2); background: rgba(251,248,242,.75); padding: 5px 12px; border-radius: 999px; z-index: var(--z-panel); white-space: nowrap; backdrop-filter: blur(8px); pointer-events: none; }
+.hint kbd { font: 650 11px/1 var(--sans); background: #fff; border-radius: 5px; padding: 2px 5px; box-shadow: 0 1px 0 rgba(0,0,0,.15); margin: 0 1px; }
+.compass { position: fixed; right: 16px; top: 76px; width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; z-index: var(--z-panel); border: 0; padding: 0; cursor: pointer; }
+.compass .needle { width: 44px; height: 44px; position: relative; }
+.compass .needle::before { content: ""; position: absolute; left: 50%; top: 3px; transform: translateX(-50%); border: 7px solid transparent; border-bottom: 17px solid var(--accent); border-top: 0; }
+.compass .needle::after { content: ""; position: absolute; left: 50%; bottom: 3px; transform: translateX(-50%); border: 7px solid transparent; border-top: 17px solid rgba(34,31,27,.25); border-bottom: 0; }
+.compass .n { position: absolute; left: 50%; top: -13px; transform: translateX(-50%); font: 700 11px/1 var(--sans); color: var(--accent); }
+body.inspecting .compass { right: 304px; }
+.scalebar { position: fixed; right: 20px; bottom: 96px; background: rgba(251,248,242,.8); padding: 6px 8px; border-radius: 8px; z-index: var(--z-panel); font: 650 11px/1 var(--sans); color: var(--ink-2); text-align: right; font-variant-numeric: tabular-nums; }
+.scalebar .bar { height: 7px; border: 2px solid var(--ink); border-top: 0; margin-bottom: 4px; margin-left: auto; background: repeating-linear-gradient(90deg, var(--ink) 0 50%, transparent 50% 100%) bottom/100% 3px no-repeat; }
+.scalebar[hidden] { display: none; }
+.tip { position: fixed; z-index: var(--z-tip); pointer-events: none; background: var(--ink); color: #fbf7f0; font-size: 12px; padding: 6px 9px; border-radius: 8px; white-space: nowrap; opacity: 0; transition: opacity 90ms linear; font-variant-numeric: tabular-nums; }
+.tip.on { opacity: 1; }
+.tip small { display: block; color: #f3b49a; }
+.toast { position: fixed; left: 50%; top: 84px; transform: translate(-50%, -8px); background: var(--ink); color: #fbf7f0; padding: 9px 14px; border-radius: 10px; font-size: 13px; z-index: var(--z-toast); opacity: 0; pointer-events: none; transition: opacity 180ms var(--ease), transform 180ms var(--ease); }
+.toast.on { opacity: 1; transform: translate(-50%, 0); }
+.collapse { position: fixed; top: 84px; left: 360px; z-index: var(--z-panel); width: 30px; height: 30px; border-radius: 9px; border: 0; cursor: pointer; transition: left 220ms var(--ease); display: grid; place-items: center; font-weight: 700; }
+.collapse.shut { left: 12px; }
+body.walking .left, body.walking .collapse { display: none; }
+.compare-btn { border: 0; padding: 12px 16px; border-radius: 14px; font-weight: 650; font-size: 13px; cursor: pointer; }
+@media (hover: hover) { .compare-btn:hover { background: #fff; } }
+.compare { width: min(1440px, 96vw); max-height: 94vh; border: 0; border-radius: 20px; padding: 18px 20px 20px; background: var(--paper); color: var(--ink); box-shadow: var(--shadow); }
+.compare::backdrop { background: rgba(20, 18, 15, .45); backdrop-filter: blur(3px); }
+.cmp-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 12px; }
+.cmp-head h2 { font: 600 22px/1.1 var(--serif); }
+.cmp-head .btn { margin-left: auto; }
+.cmp-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.cmp-col { background: rgba(255,255,255,.6); border-radius: 14px; padding: 14px; box-shadow: inset 0 0 0 1px var(--line); display: flex; flex-direction: column; gap: 8px; }
+.cmp-col.current { box-shadow: inset 0 0 0 2px var(--accent); }
+.cmp-col h3 { font: 600 18px/1.1 var(--serif); margin: 0; }
+.cmp-plan svg { width: 100%; height: auto; display: block; background: #eef0e6; border-radius: 10px; }
+table.cmp td:first-child { color: var(--ink-2); white-space: nowrap; padding-right: 10px; }
+table.cmp td:nth-child(2) { text-align: left; white-space: normal; font-weight: 600; }
+.cmp-col .btn { align-self: flex-start; margin-top: auto; }
+@media (max-width: 900px) { .cmp-grid { grid-template-columns: 1fr; } }
+.things { display: flex; flex-wrap: wrap; gap: 5px; }
+.thing { border: 0; cursor: pointer; font: 600 11.5px/1 var(--sans); padding: 5px 8px; border-radius: 999px; background: rgba(47,122,74,.1); color: #1f5a35; }
+.thing.missing { background: rgba(180,35,24,.1); color: #7a1a12; }
+@media (hover: hover) { .thing:hover { filter: brightness(.95); } }
+.party { display: flex; align-items: center; gap: 8px; background: rgba(47,93,88,.1); color: #1f423e; border-radius: 10px; padding: 7px 10px; font-size: 12.5px; margin-bottom: 12px; font-variant-numeric: tabular-nums; }
+.party b { font: 650 10px/1.6 var(--sans); letter-spacing: .12em; text-transform: uppercase; }
+.party .btn { margin-left: auto; padding: 4px 9px; min-height: 26px; font-size: 11.5px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* on-screen walk pad, Walk view only; main.js sets `bottom` to clear the toolbar and hint. Below the toolbar so its File menu opens over it. */
+.walkpad { position: fixed; right: 16px; bottom: 108px; z-index: calc(var(--z-panel) - 1); display: none; grid-template-columns: repeat(3, 48px); grid-template-areas: ". up ." "left down right"; gap: 6px; padding: 8px; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+body.walking .walkpad { display: grid; }
+.walkpad button { width: 48px; height: 48px; border: 0; border-radius: 12px; background: rgba(34,31,27,.07); font: 650 20px/1 var(--sans); cursor: pointer; touch-action: none; -webkit-tap-highlight-color: transparent; transition: background-color 120ms var(--ease), color 120ms var(--ease); }
+.walkpad button:active { background: var(--ink); color: #fbf7f0; }
+@media (hover: hover) { .walkpad button:hover:not(:active) { background: rgba(34,31,27,.12); } }
+.walkpad [data-key="ArrowUp"] { grid-area: up; } .walkpad [data-key="ArrowLeft"] { grid-area: left; }
+.walkpad [data-key="ArrowDown"] { grid-area: down; } .walkpad [data-key="ArrowRight"] { grid-area: right; }
+@media (max-width: 1100px) { .brand p { display: none; } .tab .t { font-size: 12.5px; } }
+@media (max-width: 860px) {
+  .left { width: calc(100% - 24px); } .collapse { left: auto; right: 12px; } .brand { display: none; }
+  .tabs { overflow-x: auto; max-width: calc(100vw - 24px); } .tab .t { font-size: 12px; }
+  .toolbar { flex-wrap: wrap; justify-content: center; bottom: 8px; overflow: visible; } .tbl, .sep, .hint { display: none; }
+  .compass { top: 70px; width: 46px; height: 46px; } body.inspecting .compass { right: 16px; }
+  .right { top: auto; bottom: 150px; left: 12px; right: 12px; width: auto; max-height: 40vh; }
+  .room-label { padding: 2px 5px 3px; } .room-label b { font-size: 8.5px; letter-spacing: .08em; } .room-label span { font-size: 9.5px; } .room-label em { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; } }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<header class="topbar">
+  <div class="brand glass"><span class="mark" aria-hidden="true">घर</span><div><h1>32 × 32 Home Planner</h1><p>1 bedroom · hall · open kitchen · bath · store</p></div></div>
+  <nav class="tabs glass" role="tablist" aria-label="Design options" id="tabs"></nav>
+  <button class="compare-btn glass" id="compareBtn" title="All three plans side by side at the same scale">Compare all 3</button>
+  <div class="spacer"></div>
+</header>
+<aside class="panel left glass" id="info" aria-label="Design details"></aside>
+<button class="collapse glass" id="collapse" aria-label="Hide design details" aria-expanded="true">‹</button>
+<aside class="panel right glass" id="inspector" aria-label="Selection" hidden></aside>
+<div class="toolbar glass" role="toolbar" aria-label="Planner tools">
+  <span class="tbl">View</span>
+  <div class="seg">
+    <button class="tb" data-view="plan" aria-pressed="false" title="Top-down plan (P)">Plan</button>
+    <button class="tb" data-view="orbit" aria-pressed="true" title="Orbit in 3D (O)">3D</button>
+    <button class="tb" data-view="walk" aria-pressed="false" title="Walk through at eye level (G)">Walk</button>
+  </div>
+  <div class="sep"></div>
+  <span class="tbl">Edit</span>
+  <div class="seg edit">
+    <button class="tb" data-mode="arrange" aria-pressed="true" title="Move furniture">Furniture</button>
+    <button class="tb" data-mode="walls" aria-pressed="false" title="Move walls, doors and windows (B)">Walls &amp; doors</button>
+  </div>
+  <div class="swap edit">
+    <button class="tb wallonly" id="addDoor" title="Click a wall to add a door">+ Door</button>
+    <button class="tb wallonly" id="addWindow" title="Click a wall to add a window">+ Window</button>
+    <select class="tb furnonly" id="addItem" aria-label="Add furniture"><option value="">+ Add item</option></select>
+  </div>
+  <div class="sep"></div>
+  <span class="tbl">Cutaway</span>
+  <div class="seg edit">
+    <button class="tb" data-wall="auto" aria-pressed="true" title="Hide walls facing the camera">Auto</button>
+    <button class="tb" data-wall="full" aria-pressed="false" title="Full height walls">Full</button>
+    <button class="tb" data-wall="cut" aria-pressed="false" title="Dollhouse: all walls cut at 3½ ft">Low</button>
+  </div>
+  <button class="tb" id="labels" aria-pressed="true" title="Room labels (L)">Labels</button>
+  <button class="tb" id="night" aria-pressed="false" title="Evening lighting (N)">Night</button>
+  <div class="sep"></div>
+  <button class="tb" id="undo" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
+  <button class="tb" id="redo" title="Redo (Ctrl+Y)" aria-label="Redo">↷</button>
+  <button class="tb" id="shot" title="Save a PNG snapshot of this view">Snapshot</button>
+  <details class="menu" id="fileMenu">
+    <summary class="tb" title="Save, load or reset layouts">File ▾</summary>
+    <div class="menu-pop glass" role="menu">
+      <button class="tb" id="export" role="menuitem" title="Download this layout as JSON">Export layout…</button>
+      <button class="tb" id="import" role="menuitem" title="Load a layout JSON">Import layout…</button>
+      <button class="tb" id="reset" role="menuitem" title="Restore this design">Reset this design</button>
+    </div>
+  </details>
+  <input type="file" id="file" accept=".json,application/json" hidden>
+</div>
+<div class="hint" id="hint"></div>
+<div class="walkpad glass" id="walkpad" role="group" aria-label="Walk controls">
+  <button data-key="ArrowUp" aria-label="Walk forward" title="Walk forward (W or ↑)">↑</button>
+  <button data-key="ArrowLeft" aria-label="Turn left" title="Turn left (A or ←)">←</button>
+  <button data-key="ArrowDown" aria-label="Walk back" title="Walk back (S or ↓)">↓</button>
+  <button data-key="ArrowRight" aria-label="Turn right" title="Turn right (D or →)">→</button>
+</div>
+<button class="compass glass" id="compass" title="Reset to north-up / home view" aria-label="Reset view to north"><div class="needle" id="needle"><span class="n">N</span></div></button>
+<div class="scalebar" id="scalebar" hidden><div class="bar" id="scalebarBar"></div><span id="scalebarTxt">10 ft</span></div>
+<dialog class="compare" id="compare" aria-labelledby="cmpTitle"><div class="cmp-head"><h2 id="cmpTitle">Compare the three designs</h2><span class="meta">Same scale · north up · live with your edits</span><button class="btn" id="cmpClose">Close</button></div><div class="cmp-grid" id="cmpGrid"></div></dialog>
+<div class="tip" id="tip"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<!--APP-->
+</body>
+</html>
