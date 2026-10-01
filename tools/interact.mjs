@@ -168,6 +168,41 @@ assert.equal(await page.evaluate(() => app.design.rooms.find(r => r.id === 'bed'
 console.log('✓ persisted across reload');
 await page.evaluate(() => localStorage.clear());
 
+// 9b. a save from the three-design version keeps its edits once designs 4–6 exist, and is re-saved by id
+const x0 = await page.evaluate(() => {
+  const old = app.designs.slice(0, 3).map(d => JSON.parse(JSON.stringify({ rooms: d.rooms, openings: d.openings, items: d.items })));
+  old[0].items[0].x += 0.25;
+  localStorage.setItem('ghar32.v1', JSON.stringify({ v: 1, di: 0, designs: old }));
+  return old[0].items[0].x;
+});
+await page.goto('file://' + PAGE + '?design=1&view=plan');
+await page.waitForFunction(() => window.app && app.frames > 2, null, { timeout: 120000 });
+assert.deepEqual(await page.evaluate(() => ({ n: app.designs.length, x: app.designs[0].items[0].x, id4: app.designs[3].id })), { n: 7, x: x0, id4: 'aangan' }, 'old save merged');
+await page.keyboard.press('6'); await settle();
+assert.equal(await page.evaluate(() => app.design.id), 'lightwell', 'key 6 opens design 6');
+await page.waitForFunction(() => JSON.parse(localStorage.getItem('ghar32.v1')).designs.length === 7, null, { timeout: 10000 });
+const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('ghar32.v1')));
+assert.ok(stored.designs[0].id === 'vastu' && stored.designs[0].items[0].x === x0 && stored.di === 5, 're-saved by design id');
+console.log('✓ old 3-design save kept its edits; designs 4–7 added; key 6 works');
+await page.evaluate(() => localStorage.clear());
+
+// 9c. plot designs: no window in a neighbour's wall; compare shows designs 4–7
+await page.goto('file://' + PAGE + '?fresh&design=4&view=plan');
+await page.waitForFunction(() => window.app && app.frames > 2, null, { timeout: 120000 }); await settle();
+await page.keyboard.press('b'); await settle();
+const n4 = await page.evaluate(() => app.design.openings.length);
+await page.click('#addWindow');
+const ew = await screen(31.62, 5, 18);
+await page.mouse.click(ew.x, ew.y); await settle();
+assert.equal(await page.evaluate(() => app.design.openings.length), n4, 'window refused on the east party wall');
+assert.match(await page.textContent('#toast'), /neighbour/, 'explains why');
+await page.keyboard.press('Escape'); await page.keyboard.press('b'); await settle();
+await page.click('#compareBtn'); await settle();
+assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('#cmpGrid .kicker')].map(k => k.textContent)), ['Design 4', 'Design 5', 'Design 6', 'Design 7'], 'compare shows designs 4–7');
+await shot('i9-compare-46');
+await page.click('#cmpClose');
+console.log('✓ neighbour wall refuses windows; compare 4–7');
+
 // 10. compare dialog, plan rotation, guest overlay, night mode
 await page.goto('file://' + PAGE + '?fresh&design=2&view=plan');
 await page.waitForFunction(() => window.app && app.frames > 2, null, { timeout: 120000 }); await settle();

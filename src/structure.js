@@ -2,7 +2,7 @@
 // from a design and its derived walls.
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
-import { WALL_H, wallSpan, clearRect, assignOpenings, fmtFt } from './plan.js';
+import { WALL_H, wallSpan, clearRect, assignOpenings, fmtFt, onNeighbourWall } from './plan.js';
 import { tex, mat, TEX_FT } from './models.js';
 
 export const CUT = 3.5;       // cutaway height for dollhouse views
@@ -19,6 +19,10 @@ const paintMat = c => once('paint' + c, () => std({ color: PAINT[c] || PAINT.war
 const M = {
   tile: () => once('wallTile', () => std({ map: repeatTex('wallTile'), roughness: 0.2 })),
   ext: () => once('plaster', () => std({ map: repeatTex('plaster'), roughness: 0.95 })),
+  party: () => once('party', () => std({ color: '#a7a196', map: repeatTex('cement'), roughness: 0.95 })), // bare cement render on a shared wall
+  nbr: () => once('nbr', () => std({ color: '#9c968c', map: repeatTex('cement'), roughness: 0.95 })),
+  sky: () => once('skyPane', () => new THREE.MeshBasicMaterial({ color: '#dff1ff', side: THREE.DoubleSide })),
+  planMark: () => once('planMark', () => new THREE.LineDashedMaterial({ color: '#5d564d', dashSize: 0.6, gapSize: 0.4 })),
   poche: () => once('poche', () => std({ color: '#34302c', roughness: 0.85 })),
   cap: () => once('cap', () => std({ color: '#d9cfbf', roughness: 0.9 })),
   plinth: () => once('plinthC', () => std({ color: '#8f887d', roughness: 0.95 })),
@@ -38,7 +42,7 @@ const M = {
   grass: () => once('grass', () => std({ map: repeatTex('grass'), roughness: 1 })),
   paver: () => once('paver', () => std({ map: repeatTex('paver'), roughness: 0.9 })),
 };
-const roomWall = r => (r ? (r.wall === 'tile' ? M.tile() : paintMat(r.wall)) : M.ext());
+const roomWall = (r, outside = M.ext()) => (r ? (r.wall === 'tile' ? M.tile() : paintMat(r.wall)) : outside);
 
 // Box from world bounds; UVs in feet (textures repeat via their .repeat).
 function worldBox(x0, x1, y0, y1, z0, z1, material) {
@@ -74,9 +78,16 @@ export function buildStructure(design, walls) {
     floor.receiveShadow = true; floor.userData.room = r.id;
     group.add(floor);
     group.add(worldBox(r.x - 0.3, r.x + r.w + 0.3, -0.6, -0.01, r.z - 0.3, r.z + r.d + 0.3, M.plinth()));
-    const c = new THREE.Mesh(new THREE.PlaneGeometry(r.w, r.d), M.ceiling());
-    c.rotation.x = Math.PI / 2; c.position.set(r.x + r.w / 2, WALL_H - 0.02, r.z + r.d / 2);
-    ceilings.add(c);
+    if (!r.open) {
+      const c = new THREE.Mesh(new THREE.PlaneGeometry(r.w, r.d), M.ceiling());
+      c.rotation.x = Math.PI / 2; c.position.set(r.x + r.w / 2, WALL_H - 0.02, r.z + r.d / 2);
+      ceilings.add(c);
+    }
+    if (r.sky) { // skylight: a bright pane just under the ceiling (walk view)
+      const k = r.sky, pane = new THREE.Mesh(new THREE.PlaneGeometry(k.w, k.d), M.sky());
+      pane.rotation.x = Math.PI / 2; pane.position.set(k.x + k.w / 2, WALL_H - 0.06, k.z + k.d / 2);
+      ceilings.add(pane);
+    }
     if (r.label === false) continue;
     const cr = clearRect(walls, r, design);
     const el = document.createElement('div');
@@ -84,7 +95,7 @@ export function buildStructure(design, walls) {
     el.innerHTML = `<b></b><span></span><em></em>`;
     el.children[0].textContent = r.name;
     el.children[1].textContent = `${fmtFt(cr.w)} × ${fmtFt(cr.d)}`;
-    el.children[2].textContent = `${Math.round(cr.area)} sq ft`;
+    el.children[2].textContent = `${Math.round(cr.area)} sq ft${r.open ? ' · open to sky' : ''}`;
     const lab = new CSS2DObject(el);
     lab.position.set((cr.x0 + cr.x1) / 2 + (r.lx || 0), 0.2, (cr.z0 + cr.z1) / 2 + (r.lz || 0));
     labels.push(lab); group.add(lab);
@@ -109,10 +120,11 @@ export function buildStructure(design, walls) {
     Object.assign(part, { axis: w.axis, line: w.at + w.off, a: w.a, b: w.b });
     group.add(part.lower, part.upper); parts.push(part);
     const c0 = w.at + w.off - w.t / 2, c1 = w.at + w.off + w.t / 2;
+    const out0 = part.ext && onNeighbourWall(design.plot, w.axis, w.at) ? M.party() : M.ext();
     // face materials in BoxGeometry order: +x, -x, +y, -y, +z, -z
     const mats = w.axis === 'h'
-      ? [M.cap(), M.cap(), M.poche(), M.cap(), roomWall(w.pos), roomWall(w.neg)]
-      : [roomWall(w.pos), roomWall(w.neg), M.poche(), M.cap(), M.cap(), M.cap()];
+      ? [M.cap(), M.cap(), M.poche(), M.cap(), roomWall(w.pos, out0), roomWall(w.neg, out0)]
+      : [roomWall(w.pos, out0), roomWall(w.neg, out0), M.poche(), M.cap(), M.cap(), M.cap()];
     const seg = (a0, a1, y0, y1, material = mats, tag = { wall: wi }, k0 = c0, k1 = c1) => {
       if (w.axis === 'h') partBox(part, a0, a1, y0, y1, k0, k1, material, tag);
       else partBox(part, k0, k1, y0, y1, a0, a1, material, tag);
@@ -244,6 +256,7 @@ function verandah(design, group) {
   const ground = new THREE.Mesh(floorGeo(-150, -150, 300 + W, 300 + design.plot.d), M.grass());
   ground.position.y = -0.6; ground.receiveShadow = true; group.add(ground);
   trees(group);
+  neighbours(design, group);
   if (!sh) return null;
   const D = sh.depth;
   group.add(worldBox(0, W, -0.6, -0.15, -D, 0, floorMat('kota')));
@@ -256,25 +269,41 @@ function verandah(design, group) {
   const yHi = 9.9, yLo = 8.3, z0 = 0.2, z1 = -D - 0.9, x0 = -0.6, x1 = W + 0.6;
   const yAt = z => yHi + (yLo - yHi) * (z - z0) / (z1 - z0);
   const postZ = -D + 0.4, steel = mat('steel');
-  const nPosts = Math.max(2, Math.round(W / 8) + 1);
-  for (let i = 0; i < nPosts; i++) {
-    const x = 0.4 + i * (W - 0.8) / (nPosts - 1);
-    frame.add(worldBox(x - 0.13, x + 0.13, -0.15, yAt(postZ) - 0.3, postZ - 0.13, postZ + 0.13, steel));
+  // shed.cut = [xa, xb]: that stretch of roof is removed so a room built under the shed gets its own roof
+  const spans = sh.cut ? [[x0, sh.cut[0]], [sh.cut[1], x1]].filter(([a, b]) => b - a > 0.5) : [[x0, x1]];
+  let roof = null;
+  for (const [a, b] of spans) {
+    const pa = Math.max(a, 0) + 0.4, pb = Math.min(b, W) - 0.4, n = pb - pa < 2 ? 1 : Math.max(2, Math.round((pb - pa) / 8) + 1);
+    for (let i = 0; i < n; i++) {
+      const x = n === 1 ? (pa + pb) / 2 : pa + i * (pb - pa) / (n - 1);
+      frame.add(worldBox(x - 0.13, x + 0.13, -0.15, yAt(postZ) - 0.3, postZ - 0.13, postZ + 0.13, steel));
+    }
+    frame.add(worldBox(Math.max(a, 0), Math.min(b, W), yAt(postZ) - 0.3, yAt(postZ), postZ - 0.15, postZ + 0.15, steel));
+    for (const z of [-0.6, -D / 2, z1 + 0.5]) frame.add(worldBox(a, b, yAt(z) - 0.25, yAt(z) - 0.06, z - 0.08, z + 0.08, steel));
+    // corrugated sheet: waves running down the slope, 8 samples per wave
+    const PITCH = 0.35, nx = Math.round((b - a) / (PITCH / 8)), geo = new THREE.PlaneGeometry(b - a, 1, nx, 1);
+    const p = geo.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i) + (a + b) / 2, v = p.getY(i) + 0.5, z = z0 + (z1 - z0) * v;
+      p.setXYZ(i, x, yAt(z) + 0.06 * Math.sin(x * Math.PI * 2 / PITCH), z);
+    }
+    geo.computeVertexNormals();
+    const sheet = new THREE.Mesh(geo, M.sheet()); // one shared material, so fading `roof` fades every piece
+    sheet.castShadow = sheet.receiveShadow = true;
+    frame.add(sheet); roof = roof || sheet;
   }
-  frame.add(worldBox(0, W, yAt(postZ) - 0.3, yAt(postZ), postZ - 0.15, postZ + 0.15, steel));
-  for (const z of [-0.6, -D / 2, z1 + 0.5]) frame.add(worldBox(x0, x1, yAt(z) - 0.25, yAt(z) - 0.06, z - 0.08, z + 0.08, steel));
-  // corrugated sheet: waves running down the slope, 8 samples per wave
-  const PITCH = 0.35, nx = Math.round((x1 - x0) / (PITCH / 8)), geo = new THREE.PlaneGeometry(x1 - x0, 1, nx, 1);
-  const p = geo.attributes.position;
-  for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i) + (x0 + x1) / 2, v = p.getY(i) + 0.5, z = z0 + (z1 - z0) * v;
-    p.setXYZ(i, x, yAt(z) + 0.06 * Math.sin(x * Math.PI * 2 / PITCH), z);
-  }
-  geo.computeVertexNormals();
-  const roof = new THREE.Mesh(geo, M.sheet());
-  roof.castShadow = roof.receiveShadow = true;
-  frame.add(roof);
   return { frame, roof };
+}
+
+// Neighbours' plots on the party-wall sides: a paved band beyond the plot line.
+const NBR = 16;
+function neighbours(design, group) {
+  const W = design.plot.w, D = design.plot.d, zN = -(design.shed?.depth || 0) - 2;
+  const box = { w: [-NBR, 0, zN, D], e: [W, W + NBR, zN, D], s: [-NBR, W + NBR, D, D + NBR] };
+  for (const k of design.plot.neighbours || []) {
+    const [a, b, c, d] = box[k];
+    group.add(worldBox(a + 0.05, b - 0.05, -0.6, -0.5, c, d, M.nbr()));
+  }
 }
 
 // Low-poly neem/mango trees around the site for scale.
@@ -313,8 +342,25 @@ function dimensions(design, dims, labels) {
   const pl = document.createElement('div'); pl.className = 'dim-label plot-label'; pl.textContent = `${fmt0(W)} × ${fmt0(Dd)} plot line`;
   const plo = new CSS2DObject(pl); plo.position.set(W - 4, 0.1, Dd + k + 1.1); dims.add(plo);
   if (design.shed) {
-    const el = document.createElement('div'); el.className = 'dim-label shed-label'; el.textContent = 'Tin shed · verandah (existing)';
-    const l = new CSS2DObject(el); l.position.set(W * 0.22, 0.1, -design.shed.depth / 2); dims.add(l);
+    const el = document.createElement('div'); el.className = 'dim-label shed-label'; el.textContent = design.shed.cut ? 'Tin shed (part cut for the bath)' : 'Tin shed · verandah (existing)';
+    const l = new CSS2DObject(el); l.position.set(design.shed.cut ? (design.shed.cut[1] + W) / 2 : W * 0.22, 0.1, -design.shed.depth / 2); dims.add(l);
+  }
+  const tag = (txt, x, z, cls = 'dim-label shed-label') => {
+    const el = document.createElement('div'); el.className = cls; el.textContent = txt;
+    const l = new CSS2DObject(el); l.position.set(x, 0.1, z); dims.add(l);
+  };
+  const at = { w: [-3.4, Dd * 0.8], e: [W + 3.4, Dd * 0.8], s: [W * 0.25, Dd + 3.4] }; // inside the plan frame, clear of the dim labels
+  for (const k of design.plot.neighbours || []) tag('Neighbour · shared wall', ...at[k], 'dim-label shed-label nbr-label');
+  // plan conventions: a dashed cross over open-to-sky rooms, a dashed box with a cross for skylights
+  const mark = (x0, z0, x1, z1, box) => {
+    const segs = [[x0, z0, x1, z1], [x1, z0, x0, z1]];
+    if (box) segs.push([x0, z0, x1, z0], [x1, z0, x1, z1], [x1, z1, x0, z1], [x0, z1, x0, z0]);
+    const ln = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(segs.flatMap(([a, b, c, d]) => [V(a, b), V(c, d)])), M.planMark());
+    ln.computeLineDistances(); dims.add(ln);
+  };
+  for (const r of design.rooms) {
+    if (r.open) mark(r.x + 0.6, r.z + 0.6, r.x + r.w - 0.6, r.z + r.d - 0.6, false);
+    if (r.sky) { const k = r.sky; mark(k.x, k.z, k.x + k.w, k.z + k.d, true); tag('Skylight above', k.x + k.w / 2, k.z + k.d + 0.8, 'dim-label sky-label'); }
   }
 }
 

@@ -20,6 +20,12 @@ function plotSide(axis, at, plot) {
   return Math.abs(at) < E ? 1 : Math.abs(at - max) < E ? -1 : 0;
 }
 export const isLocked = (axis, at, plot) => plotSide(axis, at, plot) !== 0;
+// Plot-boundary side of a line ('n'|'s'|'e'|'w'), and whether a neighbour builds against it (plot.neighbours).
+export function plotEdge(axis, at, plot) {
+  const s = plotSide(axis, at, plot);
+  return !s ? '' : axis === 'h' ? (s > 0 ? 'n' : 's') : (s > 0 ? 'w' : 'e');
+}
+export const onNeighbourWall = (plot, axis, at) => (plot.neighbours || []).includes(plotEdge(axis, at, plot));
 
 export function roomEdges(r) {
   return [
@@ -239,9 +245,14 @@ export function obstacles(design, walls) {
   return { solids, swings };
 }
 
-// Openings that can't work: a door leaf sweeping into another wall. Returns [{idx, msg}].
+// Openings that can't work: a door leaf sweeping into another wall, or any opening in a
+// party wall shared with a neighbour. Returns [{idx, msg}].
+const KIND = { door: 'Door', window: 'Window', vent: 'Ventilator', arch: 'Arch', almirah: 'Almirah' };
 export function openingProblems(design, walls) {
   const { solids, swings } = obstacles(design, walls), out = [];
+  design.openings.forEach((o, idx) => {
+    if (onNeighbourWall(design.plot, o.axis, o.at)) out.push({ idx, msg: `${o.main ? 'Main door' : KIND[o.type]} is in the neighbour's wall — nothing can open there` });
+  });
   for (const sw of swings) {
     if (sw.kind !== 'swing') continue;
     const o = design.openings[sw.idx], face = sw.box, inner = obb(face.x, face.z, face.hw * 2 - 0.1, face.hd * 2 - 0.1, 0);

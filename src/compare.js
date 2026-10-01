@@ -6,8 +6,9 @@ const SWATCH = { marble: '#ece5d8', wood: '#d9b48c', kitchenTile: '#dcd8cf', bat
 const inRoom = (r, x, z) => x >= r.x && x <= r.x + r.w && z >= r.z && z <= r.z + r.d;
 
 // Seats in the living zone + standing spots on a 2.5 ft grid that are clear of furniture, walls and door swings.
+// Courtyards open to the sky don't count: nobody plans a party around rain.
 export function capacity(design, walls, catalog) {
-  const living = design.rooms.filter(r => r.zone === 'living');
+  const living = design.rooms.filter(r => r.zone === 'living' && !r.open);
   const inLiving = it => living.some(r => inRoom(r, it.x, it.z));
   const seated = design.items.reduce((n, it) => n + (inLiving(it) ? SEATS[it.type] || 0 : 0), 0);
   const { solids, swings } = P.obstacles(design, walls);
@@ -43,6 +44,8 @@ export function metrics(design, base, catalog) {
   const cap = capacity(design, walls, catalog), bath = design.rooms.find(r => r.id === 'bath'), store = design.rooms.find(r => r.id === 'store');
   const outside = design.rooms.filter(r => r.x < 0 || r.z < 0 || r.x + r.w > design.plot.w || r.z + r.d > design.plot.d);
   const issues = P.findClashes(design, walls, catalog).size + P.openingProblems(design, walls).length + P.unreachableRooms(design, walls).length;
+  const sky = [...design.rooms.filter(r => r.open).map(r => `${r.name} ${Math.round(P.clearRect(walls, r, design).area)} sq ft`),
+    ...(design.rooms.some(r => r.sky) ? [`${design.rooms.filter(r => r.sky).length} skylight${design.rooms.filter(r => r.sky).length > 1 ? 's' : ''}`] : [])];
   return [
     ['Living zone', `${area(r => r.zone === 'living')} sq ft`],
     ['Bedroom', `${area(r => r.id === 'bed')} sq ft`],
@@ -50,6 +53,7 @@ export function metrics(design, base, catalog) {
     ['Beds', base.beds],
     ['Bath opens to', bath ? accessOf(design, walls, bath.id) : '—'],
     ['Store opens to', store ? accessOf(design, walls, store.id) : '—'],
+    ['Open to the sky', sky.join(' + ') || '—'],
     ['Built outside 32×32', outside.length ? outside.map(r => `${r.name} (${P.fmtFt(r.w)} × ${P.fmtFt(r.d)})`).join(', ') : 'Nothing'],
     ['Vastu', `${base.vastu.filter(v => v[2]).length} of ${base.vastu.length} ✓`],
     ['Fit check', issues ? `${issues} issue${issues > 1 ? 's' : ''}` : '✓ all clear'],
@@ -63,8 +67,25 @@ const n = v => Math.round(v * 100) / 100;
 export function planSVG(design, catalog, box) {
   const walls = P.deriveWalls(design), { solids } = P.obstacles(design, walls), byWall = P.assignOpenings(design, walls);
   const out = [];
-  if (design.shed) out.push(`<rect x="0" y="${-design.shed.depth}" width="${design.plot.w}" height="${design.shed.depth}" fill="#e4e0d6" stroke="#9a9184" stroke-width="0.12" stroke-dasharray="0.6 0.4"/><text x="${design.plot.w / 2}" y="${-design.shed.depth / 2 + 0.5}" class="sm">tin shed</text>`);
+  const W = design.plot.w, Dd = design.plot.d;
+  if (design.shed) {
+    const D = design.shed.depth, cut = design.shed.cut, spans = cut ? [[0, cut[0]], [cut[1], W]].filter(([a, b]) => b - a > 0.5) : [[0, W]];
+    for (const [a, b] of spans) out.push(`<rect x="${n(Math.max(0, a))}" y="${-D}" width="${n(Math.min(W, b) - Math.max(0, a))}" height="${D}" fill="#e4e0d6" stroke="#9a9184" stroke-width="0.12" stroke-dasharray="0.6 0.4"/>`);
+    const [a, b] = spans.reduce((p, q) => (q[1] - q[0] > p[1] - p[0] ? q : p));
+    out.push(`<text x="${n((Math.max(0, a) + Math.min(W, b)) / 2)}" y="${-D / 2 + 0.5}" class="sm">tin shed</text>`);
+  }
+  // neighbours' walls: a grey band just outside the plot line
+  const band = { w: [-1.45, 0, -0.05, Dd, -90], e: [W + 0.05, 0, W + 1.45, Dd, 90], s: [0, Dd + 0.05, W, Dd + 1.45, 0] };
+  for (const k of design.plot.neighbours || []) {
+    const [x0, z0, x1, z1, rot] = band[k], cx = n((x0 + x1) / 2), cz = n((z0 + z1) / 2);
+    out.push(`<rect x="${n(x0)}" y="${n(z0)}" width="${n(x1 - x0)}" height="${n(z1 - z0)}" fill="#c9c3b8"/><text x="${cx}" y="${n(cz + 0.3)}" class="sm" transform="rotate(${rot} ${cx} ${cz})" style="font-size:0.8px">neighbour</text>`);
+  }
   for (const r of design.rooms) out.push(`<rect x="${r.x}" y="${r.z}" width="${r.w}" height="${r.d}" fill="${SWATCH[r.floor] || '#eee'}"/>`);
+  const dash = 'fill="none" stroke="#5d564d" stroke-width="0.06" stroke-dasharray="0.5 0.35"';
+  for (const r of design.rooms) {
+    if (r.open) out.push(`<path d="M${r.x + 0.6} ${r.z + 0.6} L${r.x + r.w - 0.6} ${r.z + r.d - 0.6} M${r.x + r.w - 0.6} ${r.z + 0.6} L${r.x + 0.6} ${r.z + r.d - 0.6}" ${dash}/>`);
+    if (r.sky) out.push(`<rect x="${r.sky.x}" y="${r.sky.z}" width="${r.sky.w}" height="${r.sky.d}" ${dash}/>`);
+  }
   for (const it of design.items) {
     const c = catalog[it.type];
     if (c.wall) continue;

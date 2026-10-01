@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as P from '../src/plan.js';
 import { DESIGNS } from '../src/designs.js';
 import { CATALOG } from '../src/models.js';
+import { capacity } from '../src/compare.js';
 
 const clone = o => JSON.parse(JSON.stringify(o));
 const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} != ${b}`);
@@ -53,6 +54,16 @@ Object.assign(bathDoor, { pos: 17.9, w: 2.5 });
 assert.equal(P.openingProblems(d2b, P.deriveWalls(d2b)).length, 1, 'bath door sweeping into the wall is flagged');
 d2b.openings = d2b.openings.filter(o => !(o.type === 'door' && o.axis === 'h' && o.at === 17 && o.pos === 17.7));
 assert.deepEqual(P.unreachableRooms(d2b, P.deriveWalls(d2b)).map(r => r.id).sort(), ['bath', 'bed'], 'no bedroom door → bedroom and its bath unreachable');
+
+// party walls (designs 4–6): nothing may open in a neighbour's wall; the open north side is fine
+const d4 = clone(DESIGNS.find(d => d.id === 'aangan'));
+assert.ok(P.onNeighbourWall(d4.plot, 'h', 32) && P.onNeighbourWall(d4.plot, 'v', 0) && !P.onNeighbourWall(d4.plot, 'h', 0), 'S and W are party walls, N is open');
+assert.ok(!P.onNeighbourWall(DESIGNS[0].plot, 'v', 32), 'designs 1–3 assume open sides');
+d4.openings.push({ type: 'window', axis: 'v', at: 32, pos: 5, w: 4 });
+assert.deepEqual(P.openingProblems(d4, P.deriveWalls(d4)).map(p => p.idx), [d4.openings.length - 1], 'window in the east party wall is flagged');
+// open-to-sky courtyard: no standing guests counted in it
+const yard = d4.rooms.find(r => r.open), cap4 = capacity(d4, P.deriveWalls(d4), CATALOG);
+assert.ok(cap4.standing > 15 && !cap4.points.some(([x, z]) => x > yard.x && x < yard.x + yard.w && z > yard.z && z < yard.z + yard.d), 'no guests counted in the aangan');
 
 // doorway approach: furniture parked on the non-swing side of a door is flagged
 const d1c = clone(DESIGNS[0]);

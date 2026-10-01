@@ -52,9 +52,12 @@ function normalize(d, i) {
 function load() {
   if (!params.has('fresh')) try {
     const raw = JSON.parse(localStorage.getItem(STORE) || 'null');
-    if (raw && raw.v === 1 && Array.isArray(raw.designs) && raw.designs.length === DESIGNS.length && raw.designs.every(validDesign)) {
+    if (raw && raw.v === 1 && Array.isArray(raw.designs) && raw.designs.length <= 60) {
+      // Saved layouts are matched by design id; older saves had no ids and were stored in design order.
+      // Designs added since the save start fresh, and the client's edits to the others are kept.
+      const saved = (d, i) => raw.designs.find(s => s?.id === d.id) || (raw.designs[i] && !raw.designs[i].id ? raw.designs[i] : null);
       state.di = Math.min(DESIGNS.length - 1, Math.max(0, raw.di | 0));
-      return raw.designs.map((d, i) => normalize(d, i));
+      return DESIGNS.map((d, i) => { const s = saved(d, i); return normalize(s && validDesign(s) ? s : clone(d), i); });
     }
   } catch { /* unreadable storage → start from the shipped designs */ }
   return DESIGNS.map((d, i) => normalize(clone(d), i));
@@ -66,7 +69,7 @@ let saveTimer = 0;
 function save() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    try { localStorage.setItem(STORE, JSON.stringify({ v: 1, di: state.di, designs: designs.map(d => ({ rooms: d.rooms, openings: d.openings, items: d.items })) })); }
+    try { localStorage.setItem(STORE, JSON.stringify({ v: 1, di: state.di, designs: designs.map(d => ({ id: d.id, rooms: d.rooms, openings: d.openings, items: d.items })) })); }
     catch { /* storage full or blocked: edits stay in memory */ }
   }, 250);
 }
@@ -423,7 +426,7 @@ const lamps = new THREE.Group(); scene.add(lamps);
 const bulbMat = new THREE.MeshBasicMaterial({ color: '#ffe2b0' });
 function buildLamps() {
   clearGroup(lamps);
-  const spots = D.rooms.filter(r => r.w * r.d > 30).map(r => [r.x + r.w / 2, r.z + r.d / 2, r.w * r.d > 150 ? 22 : 12]);
+  const spots = D.rooms.filter(r => r.w * r.d > 30 && !r.open).map(r => [r.x + r.w / 2, r.z + r.d / 2, r.w * r.d > 150 ? 22 : 12]);
   const m = D.openings.find(o => o.main);
   if (m && D.shed) spots.push([m.pos, -2.5, 10]);
   for (const [x, z, power] of spots) {
@@ -600,6 +603,7 @@ function onDown(e) {
   if (pendingAdd) {
     const obj = pickFrom(S.pickWalls), w = obj && walls[obj.userData.wall], p = groundHit();
     if (!w || w.kind === 'open' || !p) { toast('Click on a solid wall to place it'); return; }
+    if (P.onNeighbourWall(D.plot, w.axis, w.at)) { toast('That is the neighbour’s wall: no doors or windows there. Try the north wall or a courtyard wall.'); return; }
     const width = pendingAdd === 'door' ? 3 : 4, along = w.axis === 'h' ? p.x : p.z;
     if (w.b - w.a < width + 0.6) { toast('That wall is too short for it'); return; }
     const before = JSON.stringify(D);
@@ -718,9 +722,9 @@ function hover(e) {
   clearGroup(viz.hover); clearGroup(viz.wall);
   let cursor = '';
   if (pendingAdd) {
-    const obj = pickFrom(S.pickWalls), w = obj && walls[obj.userData.wall];
-    cursor = w && w.kind !== 'open' ? 'crosshair' : 'not-allowed';
-    showTip(e, pendingAdd === 'door' ? 'Place door' : 'Place window', 'click a wall · Esc to cancel');
+    const obj = pickFrom(S.pickWalls), w = obj && walls[obj.userData.wall], nbr = w && P.onNeighbourWall(D.plot, w.axis, w.at);
+    cursor = w && w.kind !== 'open' && !nbr ? 'crosshair' : 'not-allowed';
+    showTip(e, pendingAdd === 'door' ? 'Place door' : 'Place window', nbr ? 'neighbour’s wall: not allowed' : 'click a wall · Esc to cancel');
   } else if (state.mode === 'arrange') {
     const id = pickItem();
     if (id) {
@@ -742,7 +746,7 @@ function hover(e) {
         cursor = locked ? 'not-allowed' : (w.axis === 'h' ? 'ns-resize' : 'ew-resize');
         const [a, b] = P.wallSpan(w);
         viz.wall.add(flatBox(P.wallRect({ ...w, t: Math.max(w.t, 0.5) }, a, b), 0, w.kind === 'open' ? 0.25 : 10.05, locked ? M.locked : M.wall));
-        const kind = w.kind === 'open' ? 'Open boundary' : locked ? 'Plot boundary (fixed)' : 'Wall';
+        const kind = w.kind === 'open' ? 'Open boundary' : P.onNeighbourWall(D.plot, w.axis, w.at) ? 'Neighbour’s wall (shared, fixed)' : locked ? 'Plot boundary (fixed)' : 'Wall';
         showTip(e, `${kind} · ${fmt(w.b - w.a)}`, `${roomName(w.neg)} | ${roomName(w.pos)}${locked ? '' : ' · drag to move'}`);
       } else hideTip();
     }
@@ -765,10 +769,15 @@ const openingName = o => (o.main ? 'Main door' : OPEN_NAMES[o.type]);
 const FACING = { 0: 'south', 90: 'east', 180: 'north', '-90': 'west' };
 const SWATCH = { marble: '#e9e2d6', wood: '#a8764b', kitchenTile: '#d4d0c8', bathTile: '#afc1c6', cement: '#b9b3a8', kota: '#8a968c' };
 
+// Designs 1–3 assume open sides; the rest are drawn for the real plot (neighbours on three sides).
+const groupOf = i => (DESIGNS[i].plot.neighbours ? 1 : 0);
+const GROUPS = [['Open-site ideas', 'Designs that assume open sides, before we knew about the neighbours'], ['For your plot', 'Neighbours east, west and south; light from the north and the sky']];
+const groupIdx = g => DESIGNS.map((_, i) => i).filter(i => groupOf(i) === g);
 function renderTabs() {
   const tabs = $('#tabs');
   tabs.replaceChildren();
   DESIGNS.forEach((d, i) => {
+    if (!i || groupOf(i) !== groupOf(i - 1)) { const g = el('span', 'tab-group', GROUPS[groupOf(i)][0]); g.title = GROUPS[groupOf(i)][1]; tabs.append(g); }
     const b = el('button', 'tab');
     b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(i === state.di));
     b.title = `${d.name} (${i + 1})`;
@@ -776,15 +785,20 @@ function renderTabs() {
     b.onclick = () => setDesign(i);
     tabs.append(b);
   });
+  const ids = groupIdx(groupOf(state.di));
+  $('#compareBtn').textContent = `Compare ${ids[0] + 1}–${ids[ids.length - 1] + 1}`;
 }
 function renderInfo() {
   const box = $('#info'), base = DESIGNS[state.di];
   box.replaceChildren();
   box.append(el('div', 'kicker', `Design ${state.di + 1} of ${DESIGNS.length}`), el('h2', '', base.name), el('p', 'tagline', base.tagline));
+  box.append(el('div', base.plot.neighbours ? 'site fits' : 'site', base.plot.neighbours
+    ? '✓ Drawn for your plot: neighbours east, west and south, so all light comes from the north, the courtyard or the sky'
+    : `Assumes open sides. Its east, west and south windows aren’t possible on your plot; see designs ${groupIdx(1)[0] + 1}–${groupIdx(1).at(-1) + 1}`));
   const areas = D.rooms.map(r => ({ r, c: P.clearRect(walls, r, D) }));
   const sum = f => Math.round(areas.filter(f).reduce((s, a) => s + a.c.area, 0));
   const stats = el('div', 'stats');
-  for (const [v, t] of [[sum(() => true), 'Carpet'], [sum(a => a.r.zone === 'living'), 'Living zone'], [sum(a => a.r.id === 'bed'), 'Bedroom']]) {
+  for (const [v, t] of [[sum(a => !a.r.open), 'Carpet'], [sum(a => a.r.zone === 'living'), 'Living zone'], [sum(a => a.r.id === 'bed'), 'Bedroom']]) {
     const s = el('div', 'stat'), b = el('b', '', v.toLocaleString('en-IN'));
     b.append(el('small', '', ' sq ft')); s.append(b, el('span', '', t)); stats.append(s);
   }
@@ -824,14 +838,14 @@ function renderInfo() {
     if (r.label === false) continue;
     const tr = el('tr'), td = el('td'), sw = el('span', 'swatch');
     sw.style.background = SWATCH[r.floor] || '#ccc';
-    td.append(sw, document.createTextNode(r.name));
+    td.append(sw, document.createTextNode(r.name + (r.open ? ' · open to sky' : '')));
     td.title = `${FLOOR_NAMES[r.floor] || ''} floor · click to zoom`;
     tr.append(td, el('td', '', `${fmt(c.w)} × ${fmt(c.d)}`), el('td', '', `${Math.round(c.area)}`));
     tr.style.cursor = 'pointer'; tr.onclick = () => focusRoom(r);
     t.append(tr);
   }
   const tot = el('tr', 'total');
-  tot.append(el('td', '', 'Total carpet'), el('td', '', `plot ${fmt(D.plot.w)} × ${fmt(D.plot.d)}`), el('td', '', `${sum(() => true)}`));
+  tot.append(el('td', '', 'Total carpet'), el('td', '', `plot ${fmt(D.plot.w)} × ${fmt(D.plot.d)}`), el('td', '', `${sum(a => !a.r.open)}`));
   t.append(tot); box.append(t);
   box.append(el('div', 'sec', 'Fit check'), el('div', '', ''));
   box.lastChild.id = 'warns';
@@ -899,12 +913,13 @@ function focusPoint(x, z, size) {
   }
 }
 function openCompare() {
-  const grid = $('#cmpGrid');
-  grid.replaceChildren();
+  const grid = $('#cmpGrid'), ids = groupIdx(groupOf(state.di));
+  grid.replaceChildren(); grid.style.setProperty('--n', ids.length);
+  $('#cmpTitle').textContent = `Compare designs ${ids[0] + 1}–${ids[ids.length - 1] + 1} · ${GROUPS[groupOf(state.di)][0].toLowerCase()}`;
   let x0 = 0, z0 = -10, x1 = 32, z1 = 32;
-  for (const d of designs) for (const r of d.rooms) { x0 = Math.min(x0, r.x); z0 = Math.min(z0, r.z); x1 = Math.max(x1, r.x + r.w); z1 = Math.max(z1, r.z + r.d); }
+  for (const i of ids) for (const r of designs[i].rooms) { x0 = Math.min(x0, r.x); z0 = Math.min(z0, r.z); x1 = Math.max(x1, r.x + r.w); z1 = Math.max(z1, r.z + r.d); }
   const box = [x0 - 1.5, z0 - 1.5, x1 + 1.5, z1 + 1.5], parser = new DOMParser();
-  designs.forEach((d, i) => {
+  ids.map(i => [designs[i], i]).forEach(([d, i]) => {
     const col = el('section', i === state.di ? 'cmp-col current' : 'cmp-col'), fig = el('div', 'cmp-plan');
     fig.append(document.importNode(parser.parseFromString(planSVG(d, CATALOG, box), 'image/svg+xml').documentElement, true));
     const t = el('table', 'rooms cmp');
@@ -1137,7 +1152,7 @@ addEventListener('keydown', e => {
   else if (k === 'b') setMode(state.mode === 'walls' ? 'arrange' : 'walls');
   else if (k === 'l') toggleLabels();
   else if (k === 'n') { state.night = !state.night; applyLighting(); }
-  else if (['1', '2', '3'].includes(e.key)) setDesign(+e.key - 1);
+  else if (/^[1-9]$/.test(e.key)) setDesign(+e.key - 1);
 });
 addEventListener('keyup', e => keyIds(e).forEach(id => walk.keys.delete(id)));
 addEventListener('blur', () => walk.keys.clear());
@@ -1221,7 +1236,7 @@ requestAnimationFrame(frame);
 
 // Automation hook for screenshots and scripted checks.
 window.app = {
-  state, get frames() { return frameCount; }, get design() { return D; }, get clashes() { return clashes; }, get walls() { return walls; },
+  state, get frames() { return frameCount; }, get design() { return D; }, get designs() { return designs; }, get clashes() { return clashes; }, get walls() { return walls; },
   setDesign, setView, setMode, setWallMode, select, undo, redo, focusRoom, toggleLabels, openCompare,
   showGuests(on = true) { guestsOn = on; drawGuests(); }, capacity: () => capacity(D, walls, CATALOG),
   camera: () => camera, controls, persp, ortho, flyTo, walk, CATALOG,

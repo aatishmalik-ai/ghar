@@ -12,7 +12,7 @@ const url = 'file://' + path.resolve(process.env.PAGE || 'dist/floorplan.html');
 const W = +(process.env.W || 1500), H = +(process.env.H || 950);
 
 let shots = process.argv.slice(2).map(a => { const [name, rest] = a.split(/=(.*)/s); const [q, js] = rest.split(/;(.*)/s); return { name, q, js }; });
-if (!shots.length) shots = [1, 2, 3].flatMap(d => [{ name: `d${d}-3d`, q: `design=${d}&still` }, { name: `d${d}-plan`, q: `design=${d}&view=plan` }]);
+if (!shots.length) shots = [1, 2, 3, 4, 5, 6, 7].flatMap(d => [{ name: `d${d}-3d`, q: `design=${d}&still` }, { name: `d${d}-plan`, q: `design=${d}&view=plan` }]);
 
 const browser = await chromium.launch({ executablePath: exe, headless: true, args: ['--ozone-platform=headless', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'], env });
 const page = await browser.newPage({ viewport: { width: W, height: H } });
